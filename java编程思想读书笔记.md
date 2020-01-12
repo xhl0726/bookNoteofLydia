@@ -715,3 +715,192 @@ Lanbda 表达式和方法引用提供了对函数式编程的支持，流式编�
 
 > 集合优化了对象的存储，而流和对象的处理有关。
 
+**流编程示例**：
+
+`new Random(47).ints(5, 20).distinct().limit(7).sorted().forEach(System.out::println);`
+
+流式编程采用*内部迭代*，使得编写的代码可读性更强，也更能利用多核处理器的优势。
+
+*外部迭代*：显式的编写迭代机制称为外部迭代。
+
+流是懒加载的，即只在绝对必要时才计算。由于计算延迟，它能回我们表示大大大序列而不用考虑内存问题。
+
+**Java 8 融入流的解决方案**：
+
+在接口中添加被`default`修饰的方法。流式平滑的被嵌入到现有类中。
+
+流操作类型有三种：创建流 、中间操作和终端操作
+
+### 创建流
+
+----------------
+
+* 通过`Stream.of()`将一组元素转化为流。
+
+  ```java
+  Stream.of("It's ", "a ", "wonderful ", "day ", "for ", "pie!")
+      .forEach(System.out::print);
+  ```
+
+* 每个集合可通过调用`stream()`产生一个流。**Map**集合通过调用`entrySet().stream()`产生流。
+
+* 注意**Random**类只能生成基本类型，`rand.ints(((int size),(int low,int high))).boxed()`流操作会做装箱类型，从而使得`show(Stream<T> stream)`能够接受流。
+
+* 使用 **Random** 为任意对象集合创建 **Supplier**。如用文本文件提供字符串对象。 **Stream.**`generate(Supplier<T> supplier)` ，可以接收参数  `Supplier<T>`，将其生成 `T` 类型的流。
+
+* `IntStream` 类提供了  `range()` 方法用于生成整型序列的流。
+
+  1. 编写循环求和时，可用`for(int i : IntStream.range(10,20).toArray())`，或者直接调用流的`sum()`求和。
+  2. 利用`range( 0 , n ) . forEach( i -> action.run())`（ action 是 Runnable 对象，可通过  lambda 表达式实现单方法接口函数引用）实现小功能 `repeat()`来替代`for` 循环。
+
+* **Stream.**`iterate()`两个参数：种子，方法。方法的结果添加到流，并存储作为种子供下次调用。
+
+* **Stream.**`builder()`，创建`builder`对象，可以`add(T t)`，调用`builder.build()`后，构造结束。
+
+* `Arrays`类中有一个`stream()`静态方法将**数组**转换为流。还可传入三个参数，数组，开始下标，结束下标，来传入子数组。
+
+* 正则表达式中的流：**Pattern.**` splitAsStream(String all)`，输入只能是 **CharSequence** ，返回`Stream<String>`。
+
+### 修改流元素（中间操作）
+
+-------------
+
+从一个流中获取对象，并将对象作为另一个流从后端输出，以连接到其他操作。
+
+* 跟踪和调试，`peek(System.out::print)`(无返回值的 **Consumer** 函数式接口）允许无修改的查看流中的代码。
+
+* 流元素排序，`sorted(Comparator.reverseOrder())`，传入**Comparator** 参数，也可以无参实现，也可以传入 Lambda 函数。
+
+* 移除元素，
+
+  1. `Random.java`中的`distinct()`，消除流中的重复元素。（比创建 **Set** 省事。
+  2. `Stream.filter(Predicate`)，保留与传进去的过滤器函数计算结果为 **true** 的元素。
+
+* 应用函数到元素，
+
+  1. `map(Function)`：将函数操作应用在输入流的元素中，并将返回值传递到输出流中。
+  2. `mapToInt(ToIntFunction)`：操作同上，但结果是 **IntStream**。
+  3. `mapToLong(ToLongFunction)`：操作同上，但结果是 **LongStream**。
+  4. `mapToDouble(ToDoubleFunction)`：操作同上，但结果是 **DoubleStream**。
+
+  注意如果 **Function** 返回结果是数值类型的一种，则必须用`mapTo数值类型`代替。
+
+* 想要产生元素流而非元素流的流，即将产生流的函数应用在每个元素上，然后将每个流都扁平化为元素。
+
+  1. `flatMap(Function)`：当 `Function` 产生流时使用。
+
+  2. `flatMapToInt(Function)`：当 `Function` 产生 `IntStream` 时使用。
+
+  3. `flatMapToLong(Function)`：当 `Function` 产生 `LongStream` 时使用。
+
+  4. `flatMapToDouble(Function)`：当 `Function` 产生 `DoubleStream` 时使用。
+
+### Optional类
+
+------------
+
+作为流元素的持有者，即使查看的元素不存在也能友好的提示我们， **Optional** 类`Optional<String> optString`！此外，创建空流`Stream.<String>empty()` ，在等号左边说明类型信息，编译器则可以在调用时推断类型。
+
+*  获取**Optional** 类：
+
+  1. `findFirst()` 返回一个包含第一个元素的 **Optional** 对象，如果流为空则返回 **Optional.empty**
+  2. `findAny()` 返回包含任意元素的 **Optional** 对象，如果流为空则返回 **Optional.empty**
+  3. `max()` 和 `min()` 返回一个包含最大值或者最小值的 **Optional** 对象，如果流为空则返回 **Optional.empty**
+  4. `reduce()` 不再以 `identity` 形式开头，而是将其返回值包装在 **Optional** 中。（不存在空结果的风险）
+
+* 对`Optional`的**解包函数**：
+
+  1. `ifPresent(Consumer)`：当值存在时调用 **Consumer**，否则什么也不做。
+  2. `orElse(otherObject)`：如果值存在则直接返回，否则生成 **otherObject**。
+  3. `orElseGet(Supplier)`：如果值存在则直接返回，否则使用 **Supplier** 函数生成一个可替代对象。
+  4. `orElseThrow(Supplier)`：如果值存在直接返回，否则使用 **Supplier** 函数生成一个异常。
+
+* 自己的代码中加入 **Optional** 类，使用下面三个静态方法：
+
+  1. `empty()`：生成一个空 **Optional**。
+  2. `of(value)`：将一个非空值包装到 **Optional** 里。
+  3. `ofNullable(value)`：针对一个可能为空的值，为空时自动生成 **Optional.empty**，否则将值包装在 **Optional** 中。
+
+  不能通过传递 `null` 到 `of()` 来创建 `Optional` 对象。最安全的方法是， 使用 `ofNullable()` 来优雅地处理 `null`。
+
+* **Optional** 对象操作
+
+  1. `filter(Predicate)`：将 **Predicate** 应用于 **Optional** 中的内容并返回结果。当 **Optional** 不满足 **Predicate** 时返回空。如果 **Optional** 为空，则直接返回。
+  2. `map(Function)`：如果 **Optional** 不为空，应用 **Function**  于 **Optional** 中的内容，并返回结果。否则直接返回 **Optional.empty**。
+  3. `flatMap(Function)`：同 `map()`，但是提供的映射函数将结果包装在 **Optional** 对象中，因此 `flatMap()` 不会在最后进行任何包装。
+
+  以上方法都不适用于数值型 **Optional**。一般来说，流的 `filter()` 会在 **Predicate** 返回 `false` 时移除流元素。而 `Optional.filter()` 在失败时不会删除 **Optional**，而是将其保留下来，并转化为空（一直 print 最后一行是“ Optional . empty” 。
+  
+* 假设你的生成器可能产生 `null` 值，那么当用它来创建流时，可以用  **Optional** 来**包装元素**。解包元素时，调用`stream.map(Optional::get)`。
+
+
+
+###  消费流元素（终端操作）
+
+---------------------
+
+获取流的最终结果：
+
+* 数组
+
+  1. `toArray()`：将流转换成适当类型的数组。
+  2. `toArray(generator)`：在特殊情况下，生成自定义类型的数组。
+
+* 循环
+
+  1. `forEach(Consumer)`常见如 `System.out::println` 作为 **Consumer** 函数。无序操作，仅在引入并行流时才有意义。
+  2. `forEachOrdered(Consumer)`： 保证 `forEach` 按照原始流顺序操作。
+  
+   `parallel()` ，多处理器并行操作。
+
+* 集合
+
+  1. `collect(Collector)`：使用 **Collector** 收集流元素到结果集合中。`.collect(Collectors.toCollection(TreeSet::new))`，返回`Set<String>`
+  
+  2. `collect(Supplier, BiConsumer, BiConsumer)`：同上，第一个参数 **Supplier** 创建了一个新结果集合，第二个参数 **BiConsumer** 将下一个元素包含到结果中，第三个参数 **BiConsumer** 用于将两个值组合起来。
+  
+
+`.collect(Collectors.toMap(Pair::getI, Pair::getC));`，从一个`Pair`的流里生成新的对象流，**组合多个流以生成新的对象流的唯一方法**。
+
+* 组合
+
+  1. `reduce(BinaryOperator)`：使用 **BinaryOperator** 来组合所有流中的元素。因为流可能为空，其返回值为 **Optional**。
+  2. `reduce(identity, BinaryOperator)`：功能同上，但是使用 **identity** 作为其组合的初始值。因此如果流为空，**identity** 就是结果。
+  3. `reduce(identity, BiFunction, BinaryOperator)`：更复杂的使用形式（暂不介绍），这里把它包含在内，因为它可以提高效率。通常，我们可以显式地组合 `map()` 和 `reduce()` 来更简单的表达它。
+  
+* 匹配
+  
+  1. `allMatch(Predicate)` ：如果流的每个元素根据提供的 **Predicate** 都返回 true 时，结果返回为 true。在第一个 false 时，则停止执行计算。
+  2. `anyMatch(Predicate)`：如果流中的任意一个元素根据提供的 **Predicate** 返回 true 时，结果返回为 true。在第一个 false 是停止执行计算。
+  3. `noneMatch(Predicate)`：如果流的每个元素根据提供的 **Predicate** 都返回 false 时，结果返回为 true。在第一个 true 时停止执行计算。
+  
+  `BiPredicate<Stream<Integer>, Predicate<Integer>>`，一个二元断言，接受两个参数，测试的流和断言 **Predicate** ，适用于所有的 **Stream::Match**。
+  
+* 查找
+
+  1. `findFirst()`：返回第一个流元素的 **Optional**，如果流为空返回 **Optional.empty**。
+
+  2. `findAny()`：返回含有任意流元素的 **Optional**，如果流为空返回 **Optional.empty**。
+
+* 信息
+
+  1. `count()`：流中的元素个数。
+  2. `max(Comparator)`：根据所传入的 **Comparator** 所决定的“最大”元素。
+  3. `min(Comparator)`：根据所传入的 **Comparator** 所决定的“最小”元素。
+
+* 数字流信息
+
+  1. `average()` ：求取流元素平均值。
+  2. `max()` 和 `min()`：数值流操作无需 **Comparator**。
+  3. `sum()`：对所有流元素进行求和。
+  4. `summaryStatistics()`：生成可能有用的数据。目前并不太清楚这个方法存在的必要性，因为我们其实可以用更直接的方法获得需要的数据。
+
+  
+
+  ## 第十五章 异常
+
+  
+
+  
+
+  
