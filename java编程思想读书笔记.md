@@ -3,6 +3,7 @@
 
 
 # JAVA编程思想读书笔记
+
 ## 第十一章 内部类
 
 > 一个定义在另一个类中的类叫做内部类。
@@ -473,7 +474,6 @@ class ReversibleArrayList<T> extends ArrayList<T> {
 ---------------
 
 
-
 ## 第十三章  **函数式编程**
 
 > 函数式编程语言操纵代码片段就像操作数据一样容易。 虽然 Java 不是函数式语言，但 Java 8 Lambda 表达式和方法引用 (Method References) 允许你以函数式编程。
@@ -707,7 +707,7 @@ Lanbda 表达式和方法引用提供了对函数式编程的支持，流式编�
 
 **第十三章脚注：**
 
-[^1]:想方设法不提供关联对象，进行方法引用，通过了编译，还是用不了。
+[^1]: 想方设法不提供关联对象，进行方法引用，通过了编译，还是用不了。
 
 ----------
 
@@ -801,7 +801,7 @@ Lanbda 表达式和方法引用提供了对函数式编程的支持，流式编�
 
 作为流元素的持有者，即使查看的元素不存在也能友好的提示我们， **Optional** 类`Optional<String> optString`！此外，创建空流`Stream.<String>empty()` ，在等号左边说明类型信息，编译器则可以在调用时推断类型。
 
-*  获取**Optional** 类：
+* 获取**Optional** 类：
 
   1. `findFirst()` 返回一个包含第一个元素的 **Optional** 对象，如果流为空则返回 **Optional.empty**
   2. `findAny()` 返回包含任意元素的 **Optional** 对象，如果流为空则返回 **Optional.empty**
@@ -830,7 +830,7 @@ Lanbda 表达式和方法引用提供了对函数式编程的支持，流式编�
   3. `flatMap(Function)`：同 `map()`，但是提供的映射函数将结果包装在 **Optional** 对象中，因此 `flatMap()` 不会在最后进行任何包装。
 
   以上方法都不适用于数值型 **Optional**。一般来说，流的 `filter()` 会在 **Predicate** 返回 `false` 时移除流元素。而 `Optional.filter()` 在失败时不会删除 **Optional**，而是将其保留下来，并转化为空（一直 print 最后一行是“ Optional . empty” 。
-  
+
 * 假设你的生成器可能产生 `null` 值，那么当用它来创建流时，可以用  **Optional** 来**包装元素**。解包元素时，调用`stream.map(Optional::get)`。
 
 
@@ -850,15 +850,14 @@ Lanbda 表达式和方法引用提供了对函数式编程的支持，流式编�
 
   1. `forEach(Consumer)`常见如 `System.out::println` 作为 **Consumer** 函数。无序操作，仅在引入并行流时才有意义。
   2. `forEachOrdered(Consumer)`： 保证 `forEach` 按照原始流顺序操作。
-  
+
    `parallel()` ，多处理器并行操作。
 
 * 集合
 
   1. `collect(Collector)`：使用 **Collector** 收集流元素到结果集合中。`.collect(Collectors.toCollection(TreeSet::new))`，返回`Set<String>`
-  
+
   2. `collect(Supplier, BiConsumer, BiConsumer)`：同上，第一个参数 **Supplier** 创建了一个新结果集合，第二个参数 **BiConsumer** 将下一个元素包含到结果中，第三个参数 **BiConsumer** 用于将两个值组合起来。
-  
 
 `.collect(Collectors.toMap(Pair::getI, Pair::getC));`，从一个`Pair`的流里生成新的对象流，**组合多个流以生成新的对象流的唯一方法**。
 
@@ -867,15 +866,15 @@ Lanbda 表达式和方法引用提供了对函数式编程的支持，流式编�
   1. `reduce(BinaryOperator)`：使用 **BinaryOperator** 来组合所有流中的元素。因为流可能为空，其返回值为 **Optional**。
   2. `reduce(identity, BinaryOperator)`：功能同上，但是使用 **identity** 作为其组合的初始值。因此如果流为空，**identity** 就是结果。
   3. `reduce(identity, BiFunction, BinaryOperator)`：更复杂的使用形式（暂不介绍），这里把它包含在内，因为它可以提高效率。通常，我们可以显式地组合 `map()` 和 `reduce()` 来更简单的表达它。
-  
+
 * 匹配
-  
+
   1. `allMatch(Predicate)` ：如果流的每个元素根据提供的 **Predicate** 都返回 true 时，结果返回为 true。在第一个 false 时，则停止执行计算。
   2. `anyMatch(Predicate)`：如果流中的任意一个元素根据提供的 **Predicate** 返回 true 时，结果返回为 true。在第一个 false 是停止执行计算。
   3. `noneMatch(Predicate)`：如果流的每个元素根据提供的 **Predicate** 都返回 false 时，结果返回为 true。在第一个 true 时停止执行计算。
-  
+
   `BiPredicate<Stream<Integer>, Predicate<Integer>>`，一个二元断言，接受两个参数，测试的流和断言 **Predicate** ，适用于所有的 **Stream::Match**。
-  
+
 * 查找
 
   1. `findFirst()`：返回第一个流元素的 **Optional**，如果流为空返回 **Optional.empty**。
@@ -897,10 +896,207 @@ Lanbda 表达式和方法引用提供了对函数式编程的支持，流式编�
 
   
 
-  ## 第十五章 异常
+## 第十五章 异常
 
-  
+  错误恢复在 Java 中格外重要—— Java 的主要目标之一就是创建供他人所使用的程序构件。Java 使用异常来提供一致的错误报告模型，**异常处理**也是 Java 中唯一官方的错误报告机制。通过强制规定的形式来消除错误处理过程中随心所欲的因素。
 
-  
+  *异常情形*是指阻止当前方法或作用域继续执行的问题，解决方法是从当前环境跳出并把问题提交给上一级环境。
 
-  
+  1. 使用 new 在堆上创建异常对象，伴随着存储空间分配和构造器的调用。所有的标准异常类的两个构造器：无参构造器和接受字符串作为参数（以便把相关信息放入异常对象）的构造器。
+  2. 然后当前的执行路径被终止，并从当前环境中弹出（ **throw** ）对异常对象的引用。**异常最重要的部分就是类名**。
+  3. 异常处理机制接管程序，搜寻参数与异常类型相匹配的第一个处理程序，然后运行异常处理程序。以关键字 **catch** 表示。
+
+  *监控区域*是一段可能产生异常的代码，后面跟着处理这些异常的代码。
+
+  异常处理理论的两种模型，终止模型（ Java 和C++ 所支持）和恢复模型（不实用，耦合度高：恢复性的处理程序需要了解异常抛出的地点，则势必要包含依赖于抛出位置的非通用性代码）。
+
+  ### 异常机制用法：自定义和声明
+
+---------------
+
+* 自定义异常类，必须从已有的异常类继承，最好选择意思相近的异常类代码，最简单的方法是编译器产生无参构造器。
+
+* 输出：
+
+  **Exception** 从 **Throwable** 类继承。因此异常对象可调用 Throwable 类声明的 `printStackTrace()`方法，无参则信息被输出到标准错误流 System.err ；传入参数`System.out`则被输出。异常类的打印方法**getMessage（）**，有点类似于 **toString（）**。
+
+* 记录日志：
+
+  使用 java.util.logging 工具将输出记录到日志中。
+
+  ```java
+   private static Logger logger =
+              Logger.getLogger("LoggingException");//创建与String相关联的 Logger对象
+      LoggingException() {
+          StringWriter trace = new StringWriter();
+          printStackTrace(new PrintWriter(trace));//传入java.io.StringWriter对象给
+          //java.io.PrintWriter对象作为参数。通过调用 toString()，将输出抽取为一个String
+          logger.severe(trace.toString()); //向Logger写入的方式之一：直接调
+         									 //用与日志记录消息的级别关联的方法
+      }
+  ```
+
+* ***异常声明***：
+
+  ```java
+  void f() throws TooBig, TooSmall, DivZero { // ...
+  ```
+
+  代码必须与异常说明保持一致。当然也可以先声明抛出异常，实际上却不抛出，为异常先占个位子。在定义抽象基类和接口时这种能力很重要，这样派生类或接口实现就能够抛出这些预先声明的异常。
+
+* 捕获所有异常：
+
+  `catch(Exception e)`，最好放在处理程序列表的末尾，以防它在其他处理程序前把异常给捕获了。
+
+  Exception 是与编程有关的所有异常类的基类，所以不含太多具体信息。其基类是 **Throwable**，有`getMessage();getLocallizedMessage();`获取详细信息；`toString();`返回简单描述；`printStackTrace();printStackTrace(PrintStream); printStackTrace(java.io.PrintWriter)`打印 Throwable 和 Throwable 的调用栈轨迹。
+
+  匹配时不要求抛出的异常和程序声明的异常完全匹配，派生类的对象也可以匹配其基类的处理程序。
+
+* **多重捕获：**
+
+  一组具有相同基类的异常，可以直接 catch 其基类型对其进行捕获。
+
+  如果没有相同基类型，Java 7 后可以`catch(Exception1|Exception2|Exception3 e)`。而之前只能逐个 catch 。
+
+* 栈轨迹
+
+  `printStackTrace() `方法所提供的信息可以通过` getStackTrace()` 方法来直接访问，这个方法将返回一个由栈轨迹中的元素( **StackTraceElement** )所构成的数组，其中每一个元素都表示栈中的一桢。元素 0 是栈顶元素，并且是调用序列中的最后一个方法调用（这个 Throwable 被创建和抛出之处）。数组中的最后一个元素和栈底是调用序列中的第一个方法调用（可通过`getMethodName()`获取方法名）。
+
+* 重新抛出异常
+
+  catch 到一个 Exception 后，可以继续 throw 出去。
+
+  会将异常抛给上一级环境中的异常处理程序，同一个 try 块后续的 catch 子句会被忽略。
+
+  抛出当前异常对象，想要更新调用栈信息，需要调用`fillnStackTrace()`方法，这将返回一个 Throwable 对象，通过将当前调用栈信息填入原来那个异常对象而建立。
+
+  Java 7 之前，捕获到什么类型，丢出去什么类型。Java 7 修复了这个问题。
+
+* **异常链**
+
+  所有 Throwable 的子类在构造器中都可以接受一个 cause 对象作为参数。只有三种基本的异常类提供了带 cause 参数的构造器。它们是 Error（用于 Java 虚拟机报告系统错误）、Exception 以及 RuntimeException。如果要把其他类型的异常链接起来，应该使用 initCause0 方法而不是构造器。
+
+  在一个普通方法里调用别的方法时，要考虑到“我不知道该这样处理这个异常，但是也不想把它‘吞’了，或若打印一些无用的消息”。异常链提供了一种新的思路来解决这个问题。可以直接把“被检查的异常”包装进 RuntimeException 里面。
+
+### Java 标准异常
+
+---------
+
+Throwable 这个 Java 类被用来表示任何可以作为异常被抛出的类。Throwable 对象可分为两种类型（指从 Throwable 继承而得到的类型）：
+
+1. Error 用来表示编译时和系统错误（除特殊情况外，一般不用你关心）；
+2. Exception 是可以被抛出的基本类型，在 Java 类库、用户方法以及运行时故障中都可能抛出 Exception 型异常。
+
+异常并非全是在 java.lang 包里定义的；有些异常是用来支持其他像 util、net 和 io 这样的程序包，这些异常可以通过它们的完整名称或者从它们的父类中看出端倪。
+
+**特例：RuntimeException**：运行时异常的类型很多，自动被 JVM 抛出，都是从 RuntimeException 类继承而来，也被称为“不受检查异常”，代表的是编程错误。如果 RuntimeException 没有被捕获而直达 main()，那么**在程序退出前将调用异常的 printStackTrace() 方法**。
+
+### finally
+
+---------
+
+无论异常是否被抛出， finally 子块都被执行。那么
+
+1. 如果把 try 块放入循环内，就建立了一个“程序继续执行前必须要达到”的条件。加入 static 类型计数器，使循环必能尝试一定次数。这样就**加强了程序的鲁棒性**。
+2. 对于没有垃圾回收和析构函数自动调用机制的语言来说，finally 保证了内存总得到释放。在 Java 中，finally 可以使除内存以外的资源回复到它们的初始状态，如打开的文件或网络连接等。
+3. finally 和带标签的 break continue 配合使用，替代 goto 语句。
+4. 何处 return 都不会影响 finally 子句的执行。
+5. finally 有可能提前 return 或者抛出新异常，导致异常不被处理或被覆盖。
+
+### 构造器和异常
+
+--------
+
+* 异常限制对构造器不起作用。派生类构造器不能捕获基类构造器抛出的异常。
+
+* *异常限制*：当覆盖方法的时候，只能抛出在基类方法的异常说明里列出的那些异常。尽管在继承过程中编译器会对异常说明做强制要求，异常说明本身不属于方法类型（方法名和参数类型组成）的一部分，因此不能基于异常说明来重载方法。
+
+* 一个出现在基类方法的异常说明中的异常，不一定会出现在派生类方法的异常说明里。
+
+* **构造器的异常处理：**
+
+  构造器内可能抛出异常，并要求清理的类，最安全的方法是使用嵌套 try 子句。基本规则是：在创建需要清理的对象之后，立即进入一个 try-finally 语句块。
+
+### try-with-resources 语法
+
+-----------
+
+Java 7 开始，try后可以跟一个带括号的定义——括号内的部分称为资源规范头。这部分内创建的对象**必须实现**  **java.lang.AutoCloseable**  接口，这个接口有一个方法：`close()`。无论如何退出 try 块，都会执行资源清理工作。
+
+ Java 5 的 Closeable 已被修改，继承了 AutoCloseable 接口。所以所有实现了 Closeable 接口的对象，都支持了  try-with-resources 特性。
+
+* 资源规范头中可以包含多个定义，并且通过分号进行分割（最后一个分号是可选的）。
+* 退出 try 块会调用资源的 `close()`方法，并以创建顺序相反的顺序关闭他们。
+* 资源规范头中抛出异常，会被 catch 子句捕获。这部分实际上被try 块包围。
+
+### 小结
+
+* 异常处理的重要原则——只有在你知道如何处理的情况下才捕获异常。否则会导致无意间“吞食”异常。
+
+* Java 被检查的异常一方面为程序“健壮性”提供了支撑，另一方面可能导致“欺骗程序”的出现。
+
+  > 好的程序设计语言能帮助程序员写出好程序，但无论哪种语言都避免不了程序员用它写出坏程序。
+
+* 应该在下列情况下使用异常：
+
+  1. 尽可能使用 try-with-resource。
+  2. 在恰当的级别处理问题。（在知道该如何处理的情况下才捕获异常。）
+  3. 解决问题并且重新调用产生异常的方法。
+  4. 进行少许修补，然后绕过异常发生的地方继续执行。
+  5. 用别的数据进行计算，以代替方法预计会返回的值。
+  6. 把当前运行环境下能做的事情尽量做完，然后把相同的异常重抛到更高层。
+  7. 把当前运行环境下能做的事情尽量做完，然后把不同的异常抛到更高层。
+  8. 终止程序。
+  9. 进行简化。（如果你的异常模式使问题变得太复杂，那用起来会非常痛苦也很烦人。）
+  10. 让类库和程序更安全。（这既是在为调试做短期投资，也是在为程序的健壮性做长期投资。）
+
+* 报告功能是异常的精髓。
+
+
+
+## 第十六章 代码校验 19-20
+
+
+
+
+
+## 第十七章 文件 19
+
+
+
+## 第十八章 字符串 20
+
+
+
+
+
+## 第十九章 类型信息 21
+
+
+
+
+
+## 第二十章 泛型  21
+
+
+
+## 第二十一章 数组 22
+
+
+
+
+
+## 第二十二章 枚举 22
+
+
+
+## 第二十三章 注解 23
+
+
+
+## 第二十四章 并发编程 23
+
+
+
+## 第二十五章 设计模式 24
+
