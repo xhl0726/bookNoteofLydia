@@ -1060,9 +1060,161 @@ Java 7 开始，try后可以跟一个带括号的定义——括号内的部分�
 
 
 
-## 第十七章 文件 19
+## 第十七章 文件 
 
+Java 7 对 I/O 设计的新改进，放在 **java.nio.file** 包， **non-blocking** 非阻塞  **io**。
 
+文件操作的两个基本组件：
+
+* 文件或者目录的路径
+* 文件本身
+
+### Path类
+
+----------
+
+**java.nio.file.Paths** 类包含重载方法 **static get()** ，接受一系列 **String** 字符串或一个 *统一资源标识符（URL）*作为参数，返回一个 **Path** 对象。一个 **Path** 对象表示一个文件或者目录的路径，是一个跨 OS 和文件系统的抽象，目的是在构造路径时不必关注底层操作，代码可在不修改情况下运行在不同的 OS 上。
+
+**Files** 工具类包含了大部分我们需要的目录操作和文件操作方法。且具有目录树相关的方法。
+
+**Path** 类的用法：
+
+```java
+ static void info(Path p) {
+        System.out.println(System.getProperty("os.name"));//展示操作系统名字
+     	////Path 类的操作
+     	int i = p.getNameCount();//路径对象分段
+     	p.endsWith(".java");//判断是否以字符串结尾
+     	Path ap = p.toAbsolutePath();//变成绝对路径
+     	Path rp = p.toRealPath();//返回实际情况下的Path
+     	show("toString", p); //直接打印，结果为一个url
+     	show("Absolute", p.isAbsolute());
+        show("FileName", p.getFileName());//获取文件名
+        show("Parent", p.getParent());//获取上一级文件夹名
+        show("Root", p.getRoot());//获取根目录
+     	URI u = p.toUri();//转为 url 对象
+     
+     	////File 类对 Path 的操作
+        show("Exists", Files.exists(p));//是否存在
+        show("RegularFile", Files.isRegularFile(p));//是否为文件
+        show("Directory", Files.isDirectory(p));//是否为文件夹
+        say("Executable", Files.isExecutable(p));
+        say("Readable", Files.isReadable(p));
+        say("Writable", Files.isWritable(p));
+        say("notExists", Files.notExists(p));
+        say("Hidden", Files.isHidden(p));
+        say("size", Files.size(p));
+        say("FileStore", Files.getFileStore(p));
+        say("LastModified: ", Files.getLastModifiedTime(p));
+        say("Owner", Files.getOwner(p));
+        say("ContentType", Files.probeContentType(p));
+        say("SymbolicLink", Files.isSymbolicLink(p));
+        if(Files.isSymbolicLink(p))
+            say("SymbolicLink", Files.readSymbolicLink(p));
+        if(FileSystems.getDefault().supportedFileAttributeViews().contains("posix"))
+            say("PosixFilePermissions", //需要先确认当前文件系统是否支持Posix 接口。
+        Files.getPosixFilePermissions(p));
+    }
+```
+
+```java
+	//Paths 的增删操作
+	pA.relativize(Path pB)// pB 相对于 pA 的路径，可达到去根目录的效果
+	p.resolve(String/Path)//在 Path 后添加一个尾路径
+	p.normalize()// ？
+    p.resolveSibling(String/Path)//替换 Path 最后一个文件名
+    Paths.get("")//获取当前文件所在文件夹
+    Paths.get(".")//获取当前文件所在文件夹/.
+```
+
+### 目录树、文件系统和路径监控
+
+----------
+
+**Files** 工具类的目录树相关方法：
+
+* 删除目录树。删除目录树的方法实现依赖于 **Files.walkFileTree(dir, new SimpleFileVisitor<Path>() {})**。*Visitor* 设计模式提供了一种标准机制来访问集合中的每个对象，然后你需要提供在每个对象上执行的操作。此操作的定义取决于实现的 **FileVisitor** 的四个抽象方法，包括：
+
+  ```
+  1.  **preVisitDirectory()**：在访问目录中条目之前在目录上运行。 
+  2.  **visitFile()**：运行目录中的每一个文件。  
+  3.  **visitFileFailed()**：调用无法访问的文件。   
+  4.  **postVisitDirectory()**：在访问目录中条目之后在目录上运行，包括所有的子目录。
+  ```
+
+* 要获取目录树的全部内容的流，使用 **Files.walk()**。
+
+* ```java
+  	Files.copy(Paths A,Paths B)//复制
+      Path tempdir = Files.createTempDirectory(Path p, "DIR_");//创建以DIR_命名开头的临时文件夹
+      Files.createTempFile(tempdir, "pre", ".non");//创建以pre开头，.non 结尾命名的临时文件，可传参null，默认后缀.tmp
+  ```
+
+**查找文件系统相关的一些信息：**
+
+* **FileSystems** 工具类获取“默认”的文件系统：`FileSystem fsys = FileSystems.getDefault()`。 
+
+  ```java
+  for(FileStore fs : fsys.getFileStores())
+              show("File Store", fs);
+          for(Path rd : fsys.getRootDirectories())
+              show("Root Directory", rd);
+          show("Separator", fsys.getSeparator());
+          show("UserPrincipalLookupService",
+              fsys.getUserPrincipalLookupService());
+          show("isOpen", fsys.isOpen());
+          show("isReadOnly", fsys.isReadOnly());
+          show("FileSystemProvider", fsys.provider());
+          show("File Attribute Views",
+          fsys.supportedFileAttributeViews());
+  ```
+
+  一个 **FileSystem** 对象也能生成 **WatchService** 和 **PathMatcher** 对象。
+
+* 在 **Path** 对象上调用 **getFileSystem（）** 以获取创建该 **Path **的文件系统
+
+* 获得给定 URL 的文件系统
+
+**路径监听**：
+
+通过 **WatchService** 可以设置一个进程对目录中的更改做出响应。
+
+```java
+		WatchService watcher = FileSystems.getDefault().newWatchService();//创建对象
+		test.register(watcher, ENTRY_DELETE);//对Path test进行注册
+        Executors.newSingleThreadScheduledExecutor()
+        .schedule(PathWatcher::delTxtFiles,//并行运行设置PathWatcher类的delTxtFiles方法。可替换为										//submit()并传参为线程。
+        250, TimeUnit.MILLISECONDS); //并设置运行前应该等待的时间
+        WatchKey key = watcher.take();//watcher.take()等待并阻塞在这里
+        for(WatchEvent evt : key.pollEvents()) {
+            System.out.println("evt.context(): " + evt.context() +
+            "\nevt.count(): " + evt.count() +
+            "\nevt.kind(): " + evt.kind());
+            System.exit(0);
+        }
+
+```
+
+从 **FileSystem** 中得到了 **WatchService** 对象，我们将其注册到 **test** 路径以及我们感兴趣的项目的变量参数列表中，可以选择 **ENTRY_CREATE**，**ENTRY_DELETE** 或 **ENTRY_MODIFY**(其中创建和删除不属于修改)。
+
+ **WatchService** 对象只对单级文件夹内的文件进行监控，不深入下一级内。
+
+### 文件查找和文件读写
+
+-------------
+
+找到文件的方法：
+
+* 在 `path` 上调用 `toString()`，然后使用 `string` 操作查看结果。
+* 在 `FileSystem` 对象上调用 `getPathMatcher()` 获得一个 `PathMatcher`，然后传入您感兴趣的模式——`glob` 或 `regex`。如`PathMatcher matcher = FileSystems.getDefault().getPathMatcher("glob:**/*.{tmp,txt}");`
+
+* glob：开头的 `**/` 表示“当前目录及所有子目录”；单 `*` 表示“任何东西”；只使用 `*.tmp`，和 `map()` 操作配合使用，将完整路径减少到末尾的名称。
+
+文件读写：
+
+* 文件很小（运行的足够快且占用内存小），`Files.readAllLines()` 一次读取整个文件（因此，“小”文件很有必要），产生一个`List<String>`。 可继续调用`.stream()`进行流操作。
+* `Files.write(Path p,byte[] bytes)` 被重载以写入 `byte` 数组或任何 `Iterable` 对象（它也有 `Charset` 选项）。
+* 文件太大，`Files.lines()` 方便地将文件转换为行的 `Stream`。可以对该对象调用`map(一些操作).forEachOrdered((PrintWriter)output::println)`进行流与流直接的转换。
 
 ## 第十八章 字符串 20
 
@@ -1098,5 +1250,46 @@ Java 7 开始，try后可以跟一个带括号的定义——括号内的部分�
 
 
 
-## 第二十五章 设计模式 24
+## 第二十五章 设计模式 
 
+模式的基本概念可以看做程序设计的基本概念，添加抽象层。即：将易变的事物与不变的事物分开。开发一个优雅且易维护设计中最困难的部分即发现“变化”的载体。设计模式的目的即隔离代码中的更改。
+
+设计模式的三种类别：
+
+1. **创建型**：如何创建对象。 比如单例模式（Singleton）
+2. **构造型**：设计对象以满足特定的项目约束。它们处理对象与其他对象连接的方式，以确保系统中的更改不需要更改这些连接。
+3. **行为型**：处理程序中特定类型的操作的对象。比如观察者和访问者模式。
+
+
+
+* **单例模式：**提供一个且只有一个对象实例的方法。
+
+  嵌套私有类在首次引用之前不会加载。创建单例的关键是防止客户端程序员直接创建对象。
+
+* **模板方式模式：**构造应用程序框架时常用。通常隐藏在底层，在基类中定义且不能更改。
+
+  它有时是一个 **private** 方法，但实际上总是 **final**。它调用其他基类方法(您覆盖的那些)来完成它的工作,但是它通常只作为初始化过程的一部分被调用(因此框架使用者不一定能够直接调用它)。
+
+* **代理模式和桥接模式：**以某种方式“代表”具体实现的方法的调用就行。
+
+  比如把接口的实现放入内部类中，并在内部类里重载接口，在外围类的重载中调用内部类的重载方法。
+
+  在结构上，代理模式和桥接模式的区别很简单:代理模式只有一个实现，而桥接模式有多个实现。在设计模式中被认为是不同的:代理模式用于控制对其实现的访问，而桥接模式允许您动态更改实现。
+
+  设计模式中描述的代理模式的常见用途如下:
+
+  1. 远程代理。它在不同的地址空间中代理对象。
+
+  2. 虚拟代理。这提供了“懒加载”来根据需要创建“昂贵”的对象。
+
+  3. 保护代理。当您希望对代理对象有权限访问控制时使用。
+
+  4. 智能引用。要在被代理的对象被访问时添加其他操作。例如，跟踪特定对象的引用数量，来实现写时复制用法，和防止对象别名。一个更简单的例子是跟踪特定方法的调用数量。您可以将Java引用视为一种保护代理，因为它控制在堆上实例对象的访问(例如，确保不使用空引用)。
+
+* **状态模式：** 
+
+  代理模式中的例子，将内部类放到外面，并实现多个，在接口中加一个 change() 方法，实现**代理对象的生命周期内从一个实现切换到另一种实现的方法**。
+
+* **状态机：**
+
+  桥接模式允许程序员更改实现，状态机利用一个结构来自动地将实现更改到下一个。当前实现表示系统所处的状态，系统在不同状态下的行为不同(因为它使用桥接模式)。
