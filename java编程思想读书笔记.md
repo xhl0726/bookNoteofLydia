@@ -1054,10 +1054,6 @@ Java 7 开始，try后可以跟一个带括号的定义——括号内的部分�
 
 
 
-## 第十六章 代码校验 19-20
-
-
-
 
 
 ## 第十七章 文件 
@@ -1212,9 +1208,11 @@ Java 7 对 I/O 设计的新改进，放在 **java.nio.file** 包， **non-blocki
 
 文件读写：
 
-* 文件很小（运行的足够快且占用内存小），`Files.readAllLines()` 一次读取整个文件（因此，“小”文件很有必要），产生一个`List<String>`。 可继续调用`.stream()`进行流操作。
+* 文件很小（运行的足够快且占用内存小），`Files.readAllLines(Paths.get(String))` 一次读取整个文件（因此，“小”文件很有必要），产生一个`List<String>`。 可继续调用`.stream()`进行流操作。
 * `Files.write(Path p,byte[] bytes)` 被重载以写入 `byte` 数组或任何 `Iterable` 对象（它也有 `Charset` 选项）。
 * 文件太大，`Files.lines()` 方便地将文件转换为行的 `Stream`。可以对该对象调用`map(一些操作).forEachOrdered((PrintWriter)output::println)`进行流与流直接的转换。
+
+
 
 ## 第十八章 字符串 20
 
@@ -1238,11 +1236,161 @@ Java 7 对 I/O 设计的新改进，放在 **java.nio.file** 包， **non-blocki
 
 
 
-## 第二十二章 枚举 22
+## 第二十二章 枚举 
+
+关键字 **enum** 可以将一组具名的值得有限集合创建为一种新的类型，每个元素作为常规的程序组件使用。**不能被继承**，可以**实现一个或多个接口**，但是通常需要一个 enum 实例才能调用其上的方法。
+
+#### 基本操作和组合操作
+
+--------------
+
+* enum 的`.values()`，返回 enum 实例的数组，且该数组元素严格保持在 enum 中生命的顺序。
+* enum的实例，调用`ordinal()` 返回一个 int 值，这是每个 enum 实例在声明时的次序，从 0 开始。
+* Enum 类实现了 Comparable 接口，所以它具有 compareTo() 方法。同时，它还实现了 Serializable 接口。
+* enum的实例，调用`getDeclaringClass() ` 返回所属的  enum 类。
+* enum的实例，调用`name() ` 返回名字。
+
+**静态类型导入用于 enum**
+
+**static import**，将 enum 实例的标识符带入当前的命名空间，所以无需再用 enum 类型来修饰 enum 实例。应当注意避免导致代码复杂度过高以至于令人难以理解。即`import static enums.Alarm.*;`
+
+**方法添加**
+
+enum中可以添加方法，甚至有 main() 方法。需要注意两点：
+
+1. 如果你打算定义自己的方法，那么必须在 enum 实例序列的最后添加一个分号。
+2. 必须先定义 enum 实例。
+
+**方法覆盖**：如重写 `toString()`方法。
+
+#### **switch** 和 **enum**
+
+**switch** 和 **enum** 组合，在 enum 元素组被覆盖的前提下，可以不要 default 语句（你非要不覆盖全编译器也不报错）；此外，在 case 语句中调用 return 编译器也会报错 缺少 default。
+
+**深究 values 方法**
+
+* 反编译 enum 类的代码
+
+```java
+OSExecute.command(
+                "javap -cp build/classes/main Explore");//Explore 是enum类名
+```
+
+* 创建 enum 类时，编译器为其
+
+  1. 添加了一个单参数的 `valueOf()`方法。（ Enum 类也有一个同名方法，需要两个参数）
+
+  2. 将其标记为 **final** 。
+
+  3. 添加了一个 static 的初始化子句。 
+
+  4. 添加了一个`values()`的 static 方法，返回 enum 实例数组。另一种获取所有 enum 实例的方式为：
+
+     enum 实例向上转型为 **Enum**，调用 `.getClass()`获得 Class 对象，再调用 Class 类的`getEnumConstants()`获得所有实例对象。
 
 
 
-## 第二十三章 注解 23
+#### 枚举的复杂操作：接口组织、EnumSet、EnumMap
+
+-------------
+
+在一个接口的内部，**创建实现该接口的枚举**，以此将元素进行分组，可以达到将枚举元素分类组织的目的。举例来说，假设你想用 enum 来表示不同类别的食物，同时还希望每个 enum 元素仍然保持 Food 类型。
+
+* 对于 enum 而言，实现接口是使其子类化的唯一办法。且可以向上转型为接口引用。
+
+* 想创建一个“校举的枚举”，那么可以创建一个新的 enum，然后用其实例包装 旧 enum 中的每一个 enum 类。
+* 一种更简洁的管理枚举的办法，就是将一个 enum 嵌套在另一个 enum 内。
+
+**使用 EnumSet 替代 Flags**
+
+```java
+		EnumSet<AlarmPoints> points = EnumSet.noneOf(AlarmPoints.class); // Empty
+        points.add(BATHROOM); //添加一个
+        points.addAll(
+                EnumSet.of(STAIR1, STAIR2, KITCHEN));//添加多个
+        points = EnumSet.allOf(AlarmPoints.class);//添加全部
+        points.removeAll(
+                EnumSet.of(STAIR1, STAIR2, KITCHEN));//去掉集合
+        points.removeAll(
+                EnumSet.range(OFFICE1, OFFICE4));//去掉OFFICE1到OFFICE2之间（包括他们两个）全部
+        points = EnumSet.complementOf(points);//求当前set中的补集
+```
+
+Java SE5 引入 EnumSet，是为了通过 enum 创建一种替代品，以替代传统的基于 int 的“位标志”。
+
+EnumSet 的设计充分考虑到了速度因素，因为它必须与非常高效的 bit 标志相竞争（其操作与 HashSet 相比，非常地快）。
+
+可以应用于多过 64 个元素的 enum。EnumSet 的基础是 long，一个 long 值有 64 位，而一个 enum 实例只需一位 bit 表示其是否存在。
+
+**使用 EnumMap**
+
+一种特殊的 Map，它要求其中的键（key）必须来自一个 enum，由于 enum 本身的限制，所以 EnumMap 在内部可由数组实现。速度很快，可用于查找。
+
+
+
+#### enum的应用场景
+
+---------
+
+**常量特定方法**
+
+Java 的 enum 允许程序员为 enum 实例编写方法，从而为每个实例赋予各自不同的行为。
+
+enum 实例不能被当做 class 类型，而是一个LikeClasses 类型的 static final实例。
+
+因为 enum 实例是 static ，无法访问外部类的非 static 元素或方法，所以对于内部的 enum 的实例来说，其行为与一半的内部类并不相同。
+
+enum 实例的方法可被覆盖。
+
+**使用 enum 的职责链**
+
+* *职责链设计模式*：
+
+  程序员以多种不同的方式来解决一个问题，然后将它们链接在一起。当一个请求到来时，它遍历这个链，直到链中的某个解决方案能够处理该请求。
+
+**使用 enum 的状态机**
+
+* *状态机*：
+
+  一个状态机可以具有有限个特定的状态，它通常根据输入，从一个状态转移到下一个状态，不过也可能存在瞬时状态（transient states），而一旦任务执行结束，状态机就会立刻离开瞬时状态。
+
+  由于 enum 对其实例有严格限制，非常适合用来表现不同的状态和输入。
+
+**多路分发 & Enum**
+
+
+
+### 本章小结
+
+优雅清晰的代码，比什么都重要。
+
+
+
+## 第二十三章 注解
+
+注解（也被称为元数据）为我们在代码中添加信息提供了一种形式化的方法，Java 5 引入，提供了 Java 无法表达的但是需要被程序员完整表述程序所需的信息。注解使得我们可以
+
+1. **以编译器验证的格式存储程序的额外信息**。
+2. 属于**语言层级的概念**，在源代码级别保存所有的信息。
+3. 创建涉及重复工作的类或接口时，可使用注解来自动化和简化流程。如 EJB 中的很多额外功作通过注解来消除。
+4. 注解可替代一些现有的系统，如 XDoclet （一种独立的文档化工具，专门设计用来生成注解风格的文档）。
+5. 从语法角度来看，注解的使用方法与修饰符的使用方法一致。
+
+注解的[语法]()十分简单，主要是在现有语法中添加 @ 符号。
+
+Java 5 引入了前三种定义在 **java.lang** 包中的注解：
+
+- **@Override**：表示当前的方法定义将覆盖基类的方法。如果你不小心拼写错误，或者方法签名被错误拼写的时候，编译器就会发出错误提示。
+- **@Deprecated**：如果使用该注解的元素被调用，编译器就会发出警告信息。
+- **@SuppressWarnings**：关闭不当的编译器警告信息。
+- **@SafeVarargs**：在 Java 7 中加入用于禁止对具有泛型varargs参数的方法或构造函数的调用方发出警告。
+- **@FunctionalInterface**：Java 8 中加入用于表示类型声明为函数式接口
+
+### 定义注解
+
+
+
+
 
 
 
@@ -1260,7 +1408,7 @@ Java 7 对 I/O 设计的新改进，放在 **java.nio.file** 包， **non-blocki
 2. **构造型**：设计对象以满足特定的项目约束。它们处理对象与其他对象连接的方式，以确保系统中的更改不需要更改这些连接。
 3. **行为型**：处理程序中特定类型的操作的对象。比如观察者和访问者模式。
 
-
+设计模式：
 
 * **单例模式：**提供一个且只有一个对象实例的方法。
 
