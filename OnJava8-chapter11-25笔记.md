@@ -1218,17 +1218,170 @@ Java 7 对 I/O 设计的新改进，放在 **java.nio.file** 包， **non-blocki
 
 本章深入研究`String`类，以及与之相关的类和工具。
 
-### 字符串的不可变
+### String相关
 
-`String` 类中每一个看起来会修改 `String` 值的方法，实际上都是创建了一个全新的 `String` 对象，以包含修改后的字符串内容。而最初的 `String` 对象则丝毫未动。
+----------
 
+* **字符串的不可变性：**`String` 类中每一个看起来会修改 `String` 值的方法，实际上都是创建了一个全新的 `String` 对象，以包含修改后的字符串内容。而最初的 `String` 对象则丝毫未动。
 
+  每当把 String 对象作为方法的参数时，都会复制一份引用，而该引用所指向的对象其实一直待在单一的物理位置上，从未动过。
+
+* **重载**：一个操作符在用在特定的类时，被赋予了特殊的意义。（用于 `String` 的 `+` 与 `+=` 是 Java 中仅有的两个重载过的操作符，Java 不允许程序员重载任何其他的操作符）
+
+* `StringBuilder`类：在对字符串进行`toString()`或各种增删改查工作时，编译器自动引入了`java.lang.StringBuilder`类。显式使用`StringBuilder`避免性能问题，且可以预先指定大小，避免频繁的重新分配缓存。`StringBuilder `是 Java SE5 引入的，在这之前用的是 `StringBuffer`。后者是线程安全的，因此开销也会大些。使用 `StringBuilder` 进行字符串操作更快一点。
+
+* 使用`Stream`也可以，`Collectors.joining()` 内部也是使用的 `StringBuilder`，这种写法不会影响性能。
+
+* **意外递归：**java 中的每个类都继承自`Object`，并覆盖了`toString()`方法，如果希望`toString()`打印类的内存地址，则需调用`Object.toString()`。如果你选择使用`this`和 `@Override toString()`，则在打印this时会出现递归调用`toString()`的惨剧。
+
+* `printf()`和`System.out.format()`（可用于 `PrintStream` 或者 `PrintWriter` 对象）是等价的。
+
+* **`Formatter`类：**Java 中，所有的格式化功能都是由 `java.util.Formatter` 类处理的。当你创建一个 `Formatter` 对象时，需要向其构造器传递一些信息，告诉它最终的结果将向哪里输出（最常用的还是 `PrintStream()`、`OutputStream` 和 `File`）。
+
+  甚至可以对插入数据进行空格和对齐优化。通过**传入一个 `StringBuilder` 对象到 `Formatter` 的构造器**，即指定了一个容器来构建目标 `String`。通用语法：
+
+  ```java
+  %[argument_index$][flags][width][.precision]conversion 
+  ```
+
+  `d`：整型
+  
+  `c`：Unicode 字符
+  
+  `b`：Boolean 值
+  
+  `s`：String
+  
+  `f`：浮点数（十进制）
+  
+  `e`：浮点数（科学计数）
+  
+  `x`：整型（十六进制）示例：`"%05x"`，输出 `00000`
+  
+  `h`：散列码（十六进制）
+  
+  `%`：字面值“%”
+
+### 正则表达式
+
+-----
+
+使用正则表达式，我们能够以编程的方式构造复杂的文本模式，并对输入`String`进行搜索。
+
+其语法是一个难点，但它确实是一种简洁、动态的语言。正则表达式提供了一种完全通用的方式，能够解决各种 `String` 处理相关的问题：匹配`String.matches(regex)`、选择、编辑以及验证。
+
+* **特殊字符**：`\\`在其他语言中，表示插入一个字面上的反斜线，无特殊意义；在 Java 中，表示“插入一个正则表达式的反斜线，其后的字符具有特殊意义”，如果想插入普通的反斜杠，`\\\`。但是换行符和制表符之类的还是单反斜杠`\n\t`。`\r`回车；`\f`换页；`\e`转义。
+
+* 一个或多个之前的表达式 `+`；可能有一个负号在前面`-?`；可能有一个负号或加号，后跟一位或多位数字`(-|\\+)?\\d+`。这是因为第一个`+`要被转义为普通符号。
+
+* `\\w`表示一个单词字符；`\\W`表示一个非单词字符；`\\s`表示空白符；`\\S`表示非空白符；`\\d`表示数字；`\\D`表示非数字。`.`表示任意字符。
+
+* `string.split(regex)`，将字符串从正则表达式匹配的地方切开。
+
+* **量词**：描述了一个模式捕获输入文本的方式：
+
+  * 贪婪型：为所有可能的模式发现尽可能多的匹配。`X*`：零个或多个 X ；`X？`：零个或一个 X ；`X+`：一个或多个 X ；`X{n}`：恰好 n 个 X ；`X{n,}`：至少 n 个 X ；`X{n,m}`：X 至少 n 次，但不超过 m 次。
+  * 勉强型：匹配满足模式所需的最少字符数。上面的例子后都加一个`?`
+  * 占有型：Java 中独有。当正则表达式被应用于 `String` 时，它会产生相当多的状态，以便在匹配失败时可以回溯。而“占有的”量词并不保存这些中间状态，因此它们可以防止回溯。它们常常用于防止正则表达式失控，因此可以使正则表达式执行起来更高效。贪婪型的例子后都加一个`+`。
+
+* **CharSequence** 接口：`CharBuffer`、`String`、`StringBuffer`、`StringBuilder` 类中抽象出了字符序列的一般化定义：
+
+  ```java
+  interface CharSequence {   
+      char charAt(int i);   
+      int length();
+      CharSequence subSequence(int start, int end);
+      String toString(); 
+  }
+  ```
+  
+  因此，这些类都实现了该接口。多数正则表达式操作都接受 `CharSequence` 类型参数。
+  
+* `Pattern` 和 `Matcher`。
+
+  ```java
+   Pattern p = Pattern.compile(arg);       
+   Matcher m = p.matcher(args[0]);       
+   while(m.find())       
+      System.out.println(           
+          "Match \"" + m.group() + "\" at positions " + m.start() + "-" + (m.end() - 1));     
+  ```
+
+* `Matcher.find()`方法可在`CharSequence`中查找多个匹配。重载的 `find()` 接收一个整型参数，该整数表示字符串中字符的位置，并以其作为搜索的起点。
+
+  ```java
+  Matcher m = Pattern.compile("\\w+").matcher("Evening is full of the linnet's wings"); 
+  		int i = 0;     
+          while(m.find(i)) {       
+              System.out.print(m.group() + " ");       
+              i++;     
+          }   
+  ```
+
+* **GROUP：**用括号划分的正则表达式，可以根据组的编号来引用某个组。组号 0 表示整个 regex ， 组号 1 表示第一对括号括起来的组。
+
+  `Matcher` 对象提供了一系列方法，用以获取与组相关的信息：
+
+  + `public int groupCount()` 返回该匹配器的模式中的分组数目，组 0 不包括在内。
+  + `public String group()` 返回前一次匹配操作（例如 `find()`）的第 0 组（整个匹配）。
+  + `public String group(int i)` 返回前一次匹配操作期间指定的组号，如果匹配成功，但是指定的组没有匹配输入字符串的任何部分，则将返回 `null`。
+  + `public int start(int group)` 返回在前一次匹配操作中寻找到的组的起始索引。
+  + `public int end(int group)` 返回在前一次匹配操作中寻找到的组的最后一个字符索引加一的值。
+
+* `split()`**方法**：
+
+  将输入 `String` 断开成 `String` 对象数组，断开边界由正则表达式确定：
+
+  ```java
+  String[] split(CharSequence input) 
+  String[] split(CharSequence input, int limit)//限制将输入分割成字符串的数量。
+  ```
+
+* **替换操作：**
+
+  + `replaceFirst(regex, String replacement)` 以参数字符串 `replacement` 替换掉第一个匹配成功的部分。
+  + `replaceAll(regex, String replacement)` 以参数字符串 `replacement` 替换所有匹配成功的部分。
+  + `appendReplacement(StringBuffer sbuf, String replacement)` 执行渐进式的替换，而不是像 `replaceFirst()` 和 `replaceAll()` 那样只替换第一个匹配或全部匹配。它允许你**调用其他方法来生成或处理 `replacement`**（`replaceFirst()` 和 `replaceAll()` 则只能使用一个固定的字符串），使你能够以编程的方式将目标分割成组，从而具备更强大的替换功能。
+  + `appendTail(StringBuffer sbuf)` 在执行了一次或多次 `appendReplacement()` 之后，调用此方法可以将输入字符串余下的部分复制到 `sbuf` 中。
+
+  ```java
+  		StringBuffer sbuf = new StringBuffer();     
+          Pattern p = Pattern.compile("[aeiou]");     
+          Matcher m = p.matcher(s);      
+          while(m.find())      
+              m.appendReplacement(sbuf, m.group().toUpperCase());      
+          m.appendTail(sbuf);     
+  ```
+
+*  `reset()` 方法，可以将现有的 `Matcher` 对象应用于一个新的字符序列；不带参数的`reset()`可以将`Matcher`对象重新设置到当前字符序列的起始位置。
+
+* `Scanner` 有一个假设，在输入结束时会抛出 `IOException`，所以 `Scanner` 会把 `IOException` 吞掉。不过，通过 `ioException()` 方法，你可以找到最近发生的异常，因此，你可以在必要时检查它。
+
+* 默认情况下`Scanner`通过空白字符对输入进行分词，也可以用正则表达式指定分隔符； `delimiter()` 方法，用来返回当前正在作为分隔符使用的 `Pattern` 对象。
+
+  在配合正则表达式使用扫描时，有一点需要注意：它仅仅针对下一个输入分词进行匹配，如果你的正则表达式中含有分隔符，那永远不可能匹配成功。
+
+  ```java
+  		Scanner scanner = new Scanner("12, 42, 78, 99, 42");    
+          scanner.useDelimiter("\\s*,\\s*");    
+          while(scanner.hasNextInt())    
+              System.out.println(scanner.nextInt()); 
+  ```
+
+  当 `next()` 方法配合指定的正则表达式使用时，将找到下一个匹配该模式的输入部分，调用 `match()` 方法就可以获得匹配的结果（结构为`MatchResult`，可调用`.group(int)`返回匹配成功的`String`）。
+
+* 在 Java 引入正则表达式（J2SE1.4）和 `Scanner` 类（Java SE5）之前，分割字符串的唯一方法是使用 `StringTokenizer` 来分词。
 
 ## 第十九章 类型信息
 
+本章将讨论 Java 是如何在运行时识别对象和类信息的。主要有两种方式：
 
+1. “传统的” RTTI：假定我们在编译时已经知道了所有的类型；
+2. “反射”机制：允许我们在运行时发现和使用类的信息。
 
+使用多态机制的方法调用，要求我们拥有基类定义的控制权。因为在你扩展程序的时候，可能会发现基类并未包含我们想要的方法。如果基类来自别人的库，这时 RTTI 便是一种解决之道：可继承一个新类，然后添加你需要的方法。
 
+一致性错误报告模型的存在使我们能够通过使用反射编写动态代码。当然，尽力编写能够进行静态检查的代码是有价值的，只要你有这样的能力。但是我相信动态代码是将 Java 与其它诸如 C++ 这样的语言区分开的重要工具之一。
 
 ## 第二十章 泛型 
 
@@ -1236,9 +1389,65 @@ Java 7 对 I/O 设计的新改进，放在 **java.nio.file** 包， **non-blocki
 
 ## 第二十一章 数组
 
+数组需要创建和初始化，大小不会改变。需要在数组上进行更复杂操作时，可以在数组和集合（Collection）中抉择。
 
+### 数组特性
 
+----
 
+将数组和其他类型的集合区分开的三个原因：
+
+* 效率，Java 中使用数组存储和随机访问对象引用序列是非常高效的。数组的线性结构，使得对元素的访问很快。代价硕士数组对象大小固定，且在生存期内不能更改。
+* 类型，在泛型前，集合类把保存对象的类型默认为 **Object**。 而数组是优于**预范型**集合类的，因为创建一个数组就指定了类型，插入错误或者提取错误类型都会抛出**编译错误**（易于用户理解），而后者多是**运行时错误**。
+* 保存基本数据类型的能力。数组可以，预泛型不可以。泛型则通过**自动装箱机制**可以。
+
+```java
+List<BerylliumSphere> sphereList = Suppliers.create(ArrayList::new, BerylliumSphere::new, 5);
+List<Integer> intList = new ArrayList<>(Arrays.asList(0, 1, 2, 3, 4, 5);
+```
+
+1. 不管使用什么类型的数组，数组中的数据集都是对**堆中**真正对象的**引用**。
+
+2. 数组对象的大小并不是真正存储在数组中对象的个数。基元数组进行显式的初始化，它的值会自动初始化。而对象数组将被初始化为 **null** 。
+
+3. Java 中可以返回数组，垃圾回收器会在用完把它清理干净。而 C++/C 则只能返回一个指向数组的指针（对数组生存期的控制会变得混乱，可能导致内存泄漏）。
+
+4.  `Arrays.toString()` 来将数组转换为可读字符串；` Arrays.deepToString()` 方法，将多维数组转换成 **String** 类型。
+5. Java 8 中的 **SplittableRandom** ,不仅能在并行操作使用，而且提供了一个高质量的随机数。
+
+#### 数组和泛型-擦除看完后回看
+
+数组和泛型不能很好地结合，你不能实例化参数类型的数组。类型擦除需要删除参数类型信息，而且数组必须知道它们所保存的确切类型，以强制保证类型安全。
+
+编译器不会让你 *实例化* 一个泛型的数组。但是，它将允许您创建对此类数组的引用。例如：
+
+```Java
+List<String>[] ls;
+```
+
+### Arrays各种操作
+
+-----
+
+1. Java 标准库 **Arrays** 类包括 `fill()` 方法，该方法将单个值复制到整个数组，或者在对象数组的情况下，将相同的引用复制到整个数组，或者指定位置序列。
+
+2. `Arrays.setAll()`：
+
+   **static Arrays.setAll()** 的重载签名为：
+
+   * **void setAll(int[] a, IntUnaryOperator gen)**
+   * **void setAll(long[] a, IntToLongFunction gen)**
+   * **void setAll(double[] a, IntToDoubleFunctiongen)**
+   * **<T> void setAll(T[] a, IntFunction<? extendsT> gen)**
+
+   ```java
+   Bob[] ba = new Bob[SZ];
+   Arrays.setAll(ba, Bob::new); // 只要我们传递的函数接收一个int参数且能产生正确的结果，就认为它完成了工作。
+   Character[] ca = new Character[SZ];
+   Arrays.setAll(ca, SimpleSetAll::getChar); //getChar生成基元类型，因此这是自动装箱。
+   ```
+
+   
 
 ## 第二十二章 枚举 
 
