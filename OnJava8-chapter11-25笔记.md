@@ -1385,7 +1385,261 @@ Java 7 对 I/O 设计的新改进，放在 **java.nio.file** 包， **non-blocki
 
 ## 第二十章 泛型 
 
+多态是一种面向对象思想的泛化机制。将方法的参数类型设为基类，则该方法可接受任何派生类作为参数，包括暂时还不存在的类。
 
+如果方法以接口而不是类作为参数，限制就宽松多了。接口可以突破继承体系的限制。
+
+泛型出现的初衷是通过解耦类或方法与所使用的类型之间的约束，使得类或方法具备最宽泛的表达力（Java 中的泛型实现灵感来自C++ 模板，概念上有差别）。
+
+泛型的核心概念：使用**类型参数**，用尖括号括住放在类名后面。用户告诉编译器使用什么类型，剩下的细节交给它来处理。Java 7开始对象定义时等号右侧可使用“钻石语法”，即省略尖括号里的类型。注意：**基本类型不能作为类型参数！**
+
+**元组：**将一组对象直接打包存储于单一对象中。可读，不可写入新对象。
+
+### 泛型应用
+
+-------
+
+#### 泛型接口
+
+例如*生成器*，一种专门负责创建对象的类，创建新对象时不需要任何参数（*工厂方法*设计模式的一种应用）。一般来说，一个生成器只定义一个方法用于创建对象。如`java.util.function.Supplier`，调用`get()`获取对象。`get()`是泛型方法，返回值为类型参数`T`。
+
+**逐个输出Supplier生成的一定数量对象**的两种方法：
+
+1. 流操作。
+
+   ```java
+   Stream.generate(new CoffeeSupplier()).limit(5).forEach(System.out::println);
+   ```
+
+2. *for-in*操作。需要`Supplier`实现`Iterable`接口，并知道何时终止循环（该接口提供`iterator()`方法，返回值为一个泛型`Iterator`）。
+
+   ```java
+   public class CoffeeSupplier
+   implements Supplier<Coffee>, Iterable<Coffee> {
+       private int size = 0;//为了iteraton的私有成员
+       public CoffeeSupplier(int sz) { size = sz; }
+        @Override
+       public Coffee get() {}//Supplier的方法
+       class CoffeeIterator implements Iterator<Coffee> {//内部类，提供Iterator
+           int count = size;
+           @Override
+           public boolean hasNext() { return count > 0; }
+           @Override
+           public Coffee next() {
+               count--;
+               return CoffeeSupplier.this.get();
+           }
+           @Override
+           public void remove() {
+               throw new UnsupportedOperationException();
+           }
+       }
+       @Override
+       public Iterator<Coffee> iterator() {//iterator方法，供 for-in 隐式调用
+           return new CoffeeIterator();
+       }
+   }
+   ```
+
+#### 泛型方法
+
+泛型方法独立于类，类是不是泛型的和它的方法是否是泛型无关。通常将单个方法泛型化比将整个类泛型化更清晰易懂。
+
+如果方法是 static 的，则无法访问该类的泛型类型参数。
+
+**泛型参数列表放在返回值之前。**
+
+1. 泛型方法和变长参数列表可以共存。
+
+   ```java
+   @SafeVarargs //保证不对变长参数列表只读不改
+       public static <T> List<T> makeList(T... args) {
+           List<T> result = new ArrayList<>();
+           for (T item : args)
+               result.add(item);
+           return result;
+       }
+   ```
+
+2. 泛型 Supplier
+
+   通过向`Supplier`中传递`Class<T> type`（强制传递 Class 对象），
+
+   ```java
+   public static <T> Supplier<T> create(Class<T> type) {
+       return new BasicSupplier<>(type);
+   }//BasicSupplier类中的 static 方法，用于类型推断，new 一个正确的Supplier。
+   Stream.generate(
+                   BasicSupplier.create(CountedObject.class))//一个具有无参构造方法的简单类
+                   .limit(5)
+                   .forEach(System.out::println);
+   ```
+
+### 擦除相关
+----------
+#### 泛型擦除
+在泛型代码内部，无法获取任何有关**泛型参数类型**的信息。`Class.getTypeParameters()`返回的`TypeVariable`对象数组，只能看到作为**参数占位符**的标识符而非类型。
+
+Java 泛型是使用擦除实现的。编译器无法确定类型`T`的边界（比如是否有方法 f()）。
+
+解决方法为：给定泛型类一个边界，以告诉编译器只能接受遵循这个边界的类型，如`class M<T extends HasF>`，声明 T 必须是 HasF 类型或其子类。所以——
+
+* **泛型只有在类型参数比某个具体类型（及其子类）更加泛化，即代码能跨多个类工作时才有用**。
+
+擦除的核心动机是你可以在泛化的客户端上使用非泛型的类库，这被称为“迁移兼容性”。将原来不是泛型的库变为泛型时，不会破坏依赖于它的代码和应用，因此**擦除**使得这种迁移成为可能。因此泛型不能用于显式的引用运行时类型的操作中。
+
+* **你只是看上去有有关参数的类型信息而已。**
+
+* 在泛型中创建数组，使用 `(T[])Array.newInstance(Class<T> kind,int size)` 是推荐的方式。创建对象，则用`Class<T> kind.newInstance();`这里`kind`需要有无参构造器。
+
+* 泛型的所有动作都发生在边界处——对入参的编译器检查和对返回值的转型。
+* 边界就是动作发生的地方，这些正是编译器在编译期间执行类型检查并插入转型代码的地方。
+
+#### 补偿擦除
+
+因为擦除，在运行时无法知道确切类型，可以通过引入类型标签来补偿擦除。意味着为所需的类型显式传递一个 **Class** 对象，以在类型表达式中使用它。类型标签可以使用动态`isInstance()`：（`(arg instanceof T)`会报错）
+
+```java
+	Class<T> kind;
+    public boolean f(Object arg) {
+        return kind.isInstance(arg);
+    }
+```
+
+编译器来保证类型标签和泛型参数相匹配。
+
+**1.** **创建类型的实例**
+
+* 使用工厂模式
+* 模板方法，抽象类中包含字段，通过无参构造函数强制字段初始化，构造函数又调用抽象的`create()`方法。这种创建方式可以在子类中定义，同时建立 T 的类型。
+
+**2.** **泛型数组**
+
+试图创建泛型数组时，使用`ArrayList`。既可以获得数组行为，又具有泛型提供的编译时类型安全性。
+
+* `T[] array = new T[sz]`记住这句话，它是错的。
+
+也可以创建`Object`数组，在使用时将其强制转换。
+
+或者使用擦除恢复。尽管必须使用 **@SuppressWarnings** 关闭来自强制类型转换的警告，但我们仍可以创建所需的实际数组类型。数组的运行时类型是确切的类型 `T[]` 。
+
+```java
+	private T[] array;
+    @SuppressWarnings("unchecked")
+    public GenericArrayWithTypeToken(Class<T> type, int sz) {
+        array = (T[]) Array.newInstance(type, sz);
+    }
+```
+
+#### 边界（多级extends例子）
+
+限定泛型类型，`extends`，类在前，接口在后。
+
+
+
+### 通配符
+
+------
+
+**通配符：**在泛型参数表达式中的问号。
+
+派生类的数组赋值给基类的引用：
+
+```java
+Fruit[] fruit = new Apple[10];
+```
+
+向 fruit 中插入 Orange，编译时通过，运行时报错。泛型的主要目标之一是将这种错误检测移到编译期。
+
+```java
+Holder<Apple> apple = new Holder<>(new Apple());
+Holder<? extends Fruit> fruit = apple; // OK
+//        fruit.set(new Apple()); // Cannot call set()
+```
+
+`set()`方法不能被调用，因为其参数是`? extends Fruit`。即只能初始化时添加，其他情况不能写入！
+
+**超类型通配符：** 指定`<? super MyClass>`，甚至使用类型参数：`<? super T>`（尽管你不能对泛型参数给出一个超类型边界；即不能声明 `<T super MyClass>` ）
+
+这使得你可以安全地传递一个类型对象到泛型类型中。可以写入了！
+
+```java
+static void writeTo(List<? super Apple> apples) {//Apple及Apple的子类型 是安全的
+        apples.add(new Apple());
+        apples.add(new Jonathan());
+        // apples.add(new Fruit()); // Error
+    }
+```
+
+**无界通配符：** `<T>`，声明“我是想用 Java 的泛型来编写这段代码，我在这里并不是要用原生类型，但是在当前这种情况下，泛型参数可以持有任何类型。”
+
+**捕获转换：** 使用`<T>`而非原生类型。如果向一个使用 `<?>` 的方法传递原生类型，那么对编译器来说，可能会推断出实际的类型参数，使得这个方法可以回转并调用另一个使用这个确切类型的方法。
+
+### 问题
+
+----
+
+* 任何基本类型都不能作为类型参数
+
+* 一个类不能实现同一个泛型接口的两种变体，由于擦除，这两个变体会变成相同的接口。（但是你手动移除掉泛型参数的话就可以通过编译）
+
+* 使用带有泛型类型参数的转型或 **instanceof** 不会有任何效果。
+
+  ```java
+  		ObjectInputStream in = new ObjectInputStream(
+              new FileInputStream(args[0]));
+          // Won't Compile:
+          //    List<Widget> lw1 =
+          //    List<>.class.cast(in.readObject());
+          List<Widget> lw2 = List.class.cast(in.readObject());
+  ```
+
+* 由于擦除，重载方法可能会产生一样的类型签名。（编译器可检测到）
+
+
+
+### 自限定的类型
+
+------------
+
+```java
+class SelfBounded<T extends SelfBounded<T>> { // ...
+```
+
+这就像两面镜子彼此照向对方所引起的目眩效果一样，是一种无限反射。**SelfBounded** 类接受泛型参数 **T**，而 **T** 由一个边界类限定，这个边界就是拥有 **T** 作为其参数的 **SelfBounded**。它强调的是当 **extends** 关键字用于边界与用来创建子类明显是不同的。
+
+本质为：基类用导出类替代其参数。这意味着泛型基类变成了“其所有导出类的公共功能”的模板，这些功能对于其所有参数和返回值，将使用导出类型。即，在所产生的类中使用**确切类型**而不是**基类型**。
+
+#### 动态类型安全
+
+因为可以向 Java 5 之前的代码传递泛型集合，所以旧式代码仍旧有可能会破坏你的集合。Java 5 的 **java.util.Collections** 中有一组便利工具，可以解决在这种情况下的类型检查问题，它们是：静态方法 `checkedCollection()` 、`checkedList()`、 `checkedMap()` 、 `checkedSet()` 、`checkedSortedMap()`和 `checkedSortedSet()`。这些方法每一个都会将你希望动态检查的集合当作第一个参数接受，并将你希望强制要求的类型作为第二个参数接受。
+
+#### 泛型异常
+
+由于擦除的原因，**catch** 语句不能捕获泛型类型的异常，因为在编译期和运行时都必须知道异常的确切类型。泛型类也不能直接或间接继承自 **Throwable**，但是，类型参数可能会在一个方法的 **throws** 子句中用到。
+
+### 混型（可与chapter25设计模式一起复习）
+
+-------
+
+即混合多个类的能力。
+
+### 潜在类型机制
+
+-----
+
+泛型代码典型地只能在泛型类型上调用少量方法，而具有潜在类型机制的语言只要求实现某个方法子集，而不是某个特定类或接口。潜在类型机制是一种代码组织和复用机制。有了它，编写出的代码相对于没有它编写出的代码，能够更容易地复用。
+
+> “我不关心你是什么类型，只要你可以 `speak()` 和 `sit()` 即可。”由于不要求具体类型，因此代码就可以更加泛化。
+
+支持潜在类型机制的语言包括 Python、C++、Ruby、SmallTalk 和 Go。Python 是动态类型语言（几乎所有的类型检查都发生在运行时），而 C++ 和 Go 是静态类型语言（类型检查发生在编译期），因此潜在类型机制不要求静态或动态类型检查。
+
+#### 对潜在类型机制的补偿
+
+尽管 Java 不直接支持潜在类型机制，但是这并不意味着泛型代码不能在不同的类型层次结构之间应用。可通过以下方法：
+
+* 反射
+* 将一个方法应用于序列。
 
 ## 第二十一章 数组
 
@@ -1442,12 +1696,117 @@ List<String>[] ls;
 
    ```java
    Bob[] ba = new Bob[SZ];
-   Arrays.setAll(ba, Bob::new); // 只要我们传递的函数接收一个int参数且能产生正确的结果，就认为它完成了工作。
+   Arrays.setAll(ba, Bob::new); 
    Character[] ca = new Character[SZ];
    Arrays.setAll(ca, SimpleSetAll::getChar); //getChar生成基元类型，因此这是自动装箱。
+   Long[] a6 = new Long[SIZE];
+   Arrays.setAll(a6, new Rand.Long()::get);
    ```
 
-   
+   原始数组类型 **int[]** ，**long[]** ，**double[]** 可以直接被 **Arrays.setAll()** 填充，但是其他的原始类型都要求用包装器类型的数组。
+
+   使用流初始化非常优雅，但是大型数组可能会耗尽堆空间。使用`setAll()`初始化更节省内存。
+
+3. 传递给 **Arrays.setAll()** 的生成器函数可以使用它接收到的数组索引修改现有的数组元素:
+
+   ```java
+   double[] da = new double[7];
+   Arrays.setAll(da, new Rand.Double()::get);
+   Arrays.setAll(da, n -> da[n] / 100);
+   ```
+
+4. `Arrays.parallelSetAll()`：
+
+   **流** 实际上可以存储到近1000万，之后会耗尽堆空间。如果用`setAll()`初始化数组，速度成为了限制，那么`Arrays.parallelSetAll()`(可能)更快的执行初始化。使用方法最好将数组分配和初始化包装进单独方法。放入**main()** 可能会耗尽内存。
+
+5. `Arrays`的其他静态方法：
+
+   - **asList()**: 获取任何序列或数组，并将其转换为一个 **列表集合** 
+
+   - **copyOf(数组，长度)**：以新的长度创建现有数组的新副本。
+
+   - **copyOfRange(数组，开始索引，结束索引)**：创建现有数组的一部分的新副本。这两个方法有一个版本，在方法调用的末尾添加目标类型来创建不同类型的数组。即向上转换/向下转换数组，也就是说，如果您有一个子类型(派生类型)的数组，而您想要一个基类型的数组，那么这些方法将生成所需的数组。同样，转基类型后再转回子类型，也可。但是，一开始直接使用基类型数组复制到子类型数组，则在编译中对类型兼容进行检查，可能得到一个运行时异常。
+
+   - **equals()**：比较两个数组是否相等。
+
+   - **deepEquals()**：多维数组的相等性比较。多维数组如果调用`equals()`比较结果是不对的。
+
+   - **stream()**：生成数组元素的流。只有“原生类型” **int**、**long** 和 **double** 可以与 **Arrays.stream()** 一起使用;对于其他的，您必须以某种方式获得一个包装类型的数组。
+
+   - **hashCode()**：生成数组的哈希值
+
+   - **deepHashCode()**: 多维数组的哈希值。
+
+   - **sort()**：排序数组
+
+   - **parallelSort()**：对数组进行并行排序，以提高速度。
+
+   - **binarySearch()**：在**已排序的数组**中查找元素。找到则返回大于等于 0 的值，否则返回负值，表示如果手动维护已排序的数组应该插入元素的位置。产生的值为 **-（插入点）-1**。插入点是大于键的第一个元素的索引，如果数组中的元素都小于指定的键，则是`a.size()`。
+
+   - **parallelPrefix()**：使用提供的函数并行累积(以获得速度)。基本上，就是数组的reduce()。
+
+     ```java
+      int[] nums = new Count.Pint().array(10);
+      System.out.println(Arrays.stream(nums).reduce(Integer::sum).getAsInt());
+      Arrays.parallelPrefix(nums, Integer::sum);//同上，可以得到中间计算，已保留在nums中
+     ```
+
+     正确使用 **parallelPrefix()** 可能相当复杂，所以通常应该只在存在内存或速度问题(或两者都有)时使用。否则，**Stream.reduce()** 应该是您的首选。
+
+   - **spliterator()**：从数组中产生一个Spliterator;这是本书没有涉及到的流的高级部分。
+
+   - **toString()**：为数组生成一个字符串表示。
+
+   - **deepToString()**：为多维数组生成一个字符串。对于所有基本类型和对象，所有这些方法都是重载的。
+
+6. `System.arraycopy()`，将一个数组复制到另一个已分配的数组中，这将不会执行自动拆装箱，两个数组必须是完全相同的类型。
+
+#### 数组排序
+
+   使用策略设计模式，将变化的代码部分封装在一个单独的类（策略对象）中。将策略对象交给相同的代码（一般的排序算法），该代码使用策略模式实现不同对象的排序。
+
+   Java 比较功能的两种方法（使用内置的排序方法，您可以对实现了 **Comparable** 接口或具有 **Comparator** 的任何对象数组 或 任何原生数组进行排序）：
+
+   **1.** **比较对象的类内实现：**
+
+   实现`java.lang.Comparable`接口，只含有一个方法`compareTo()`，该方法接受另一个与参数类型相同的对象作为参数，如果当前对象小于参数，则产生一个负值；参数相等，则返回 0 ，反之为正值。实现了该接口的对象数组可**直接调用**`Arrays.sort()`进行排序。
+
+   **2.** **比较对象的类外实现：**
+
+   创建一个实现`Comparator`接口的类，含有两个方法`compare()`和`equals()`。除了特殊的性能需求外，不需要实现`equals()`，因为所有的类都隐式继承自`Object`，它自带了`equals()`。
+
+   **例子1：**
+
+   集合类包含方法`reverseOrder()`，它生成一个**Comparator**反转自然排序顺序，作为第二个参数：
+
+   ```java
+   CompType[] a = new CompType[12];
+   Arrays.setAll(a, n -> CompType.get());
+   Arrays.sort(a, Collections.reverseOrder());
+   ```
+
+   **例子2：**
+
+   编写自己的比较器，作为`sort()`的第二个参数传入：
+
+   ```java
+   class CompTypeComparator implements Comparator<CompType> {
+       public int compare(CompType o1, CompType o2) {
+           return (o1.j < o2.j ? -1 : (o1.j == o2.j ? 0 : 1));
+       }
+   }
+   CompType[] a = new CompType[12];
+   Arrays.setAll(a, n -> CompType.get());
+   Arrays.sort(a, new CompTypeComparator());
+   ```
+
+   Java标准库中使用的排序算法被设计为最适合您正在排序的类型----原生类型的快速排序和对象的归并排序。
+
+### 本章小结
+
+优先使用集合而非数组，除非证明性能是一个问题且换到数组上会有很大的不同。
+
+
 
 ## 第二十二章 枚举 
 
